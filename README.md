@@ -3,7 +3,6 @@
 <img src="./Topit/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="200" height="200" />
 <h1 align="center">Topit</h1>
 <h3 align="center">Pin any window to the top of your screen<br><br>
-<a href="./README_zh.md"><img src="https://img.shields.io/badge/中文-README-green" height="24" alt="中文版本"/></a>
 <a href="https://lihaoyun6.github.io/topit/"><img src="https://img.shields.io/badge/Leading%20Page-blue" height="24" alt="Leading Page"/></a></h3> 
 </p>
 
@@ -16,18 +15,23 @@
 </picture>
 </p>
 
-## Installation and Usage
-### System Requirements:
-- macOS 13.0 and Later  
+## Build and Install
+### Requirements
+- macOS 13 or later
+- Xcode 26 or later
+- Internet access to resolve Swift package dependencies on the first build
 
-### Installation:
-Download the latest installation file [here](../../releases/latest) or install via Homebrew:  
+Run from the project directory:
 
 ```bash
-brew install lihaoyun6/tap/topit
+./install.command --open
 ```
 
-### Usage: 
+The script clears Topit's privacy permissions, removes stale build artifacts, builds and installs `Topit.app` in `~/Applications`, then opens it. Omit `--open` to install without launching. Since permissions are reset on every build, macOS will ask you to grant them again after each installation.
+
+This is an ad-hoc signed local build, not a notarized release.
+
+## Usage
 - Topit can pin windows from any application to the top of your workspace.  
 
 - Just open Topit and select the window you want to pin, and it will do the rest.  
@@ -35,7 +39,7 @@ brew install lihaoyun6/tap/topit
 
 ## Q&A
 **1. Why does Topit need screen recording and accessibility permissions?**
-> Topit uses the accessibility permissions and screen recording permissions to control and capture your windows.  
+> Topit uses accessibility and screen recording permissions to control and capture your windows. The installer resets these permissions before each build, so you need to grant them again after installing.
 
 **2. Does Topit consume a lot of power?**
 > Topit uses ScreenCapture Kit to capture windows with a lower CPU overhead. But it may still drain the battery faster when you pin too many windows. 
