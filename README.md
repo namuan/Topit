@@ -1,22 +1,23 @@
-# 
-<p align="center">
-<img src="./Topit/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="200" height="200" />
-<h1 align="center">Topit</h1>
-<h3 align="center">Pin any window to the top of your screen<br><br>
-<a href="https://lihaoyun6.github.io/topit/"><img src="https://img.shields.io/badge/Leading%20Page-blue" height="24" alt="Leading Page"/></a></h3> 
-</p>
+<div align="center">
+  <img src="./Topit/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="200" height="200" alt="Topit app icon" />
+  <h1>Topit</h1>
+  <p>Pin any window to the top of your screen</p>
+</div>
 
 ## Screenshots
+
 <p align="center">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./img/preview_dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="./img/preview.png">
-  <img alt="xHistory Screenshots" src="./img/preview.png" width="816"/>
-</picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./img/preview_dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="./img/preview.png">
+    <img alt="Topit screenshot" src="./img/preview.png" width="816" />
+  </picture>
 </p>
 
 ## Build and Install
+
 ### Requirements
+
 - macOS 13 or later
 - Xcode 26 or later
 - Internet access to resolve Swift package dependencies on the first build
@@ -32,20 +33,15 @@ The script clears Topit's privacy permissions, removes stale build artifacts, bu
 This is an ad-hoc signed local build, not a notarized release.
 
 ## Usage
-- Topit can pin windows from any application to the top of your workspace.  
 
-- Just open Topit and select the window you want to pin, and it will do the rest.  
-- Topit can pin any number of windows. You can move, resize or interact with them at any time.  
+Open Topit and select a window to pin. You can pin multiple windows, then move, resize, or interact with them.
 
 ## Q&A
-**1. Why does Topit need screen recording and accessibility permissions?**
-> Topit uses accessibility and screen recording permissions to control and capture your windows. The installer resets these permissions before each build, so you need to grant them again after installing.
 
-**2. Does Topit consume a lot of power?**
-> Topit uses ScreenCapture Kit to capture windows with a lower CPU overhead. But it may still drain the battery faster when you pin too many windows. 
+**Why does Topit need screen recording and accessibility permissions?**
 
-## Donate
-<img src="./img/donate.png" width="350"/>
+Topit uses accessibility and screen recording permissions to control and capture windows. The installer resets these permissions before each build, so you need to grant them again after installing.
 
-## Thanks
-[ChatGPT](https://chat.openai.com) @OpenAI  
+**Does Topit consume a lot of power?**
+
+Topit uses ScreenCaptureKit to capture windows with relatively low CPU overhead. Pinning many windows may still increase power consumption.
