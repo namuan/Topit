@@ -41,10 +41,6 @@ struct TopitApp: App {
                             }
                         })
                 )
-        }.commands {
-            CommandGroup(after: .appInfo) {
-                CheckForUpdatesView(updater: updaterController.updater)
-            }
         }
     }
 }
@@ -69,7 +65,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Window Selector".local, action: #selector(openFromMenuBar), keyEquivalent: "s")
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Settings…".local, action: #selector(settings), keyEquivalent: ",")
-        menu.addItem(withTitle: "Check for Updates…".local, action: #selector(checkForUpdates), keyEquivalent: "")
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Quit Topit".local, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusBarItem.menu = menu
@@ -118,10 +113,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Pin a Window".local, action: #selector(selectWindowToPin), keyEquivalent: "")
         menu.addItem(withTitle: "Unpin all Windows".local, action: #selector(unPinAll), keyEquivalent: "")
         return menu
-    }
-    
-    @objc func checkForUpdates() {
-        updaterController.checkForUpdates(nil)
     }
     
     @objc func unPinAll() {

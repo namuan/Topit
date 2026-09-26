@@ -9,30 +9,42 @@ import SwiftUI
 import KeyboardShortcuts
 import ServiceManagement
 
+private enum SettingsPage: Hashable {
+    case general
+    case windows
+    case hotkeys
+    case filters
+}
+
 struct SettingsView: View {
-    @State private var selectedItem: String? = "General"
+    @State private var selectedItem: SettingsPage? = .general
     
     var body: some View {
-        NavigationView {
+        NavigationSplitView {
             List(selection: $selectedItem) {
-                NavigationLink(destination: GeneralView(), tag: "General", selection: $selectedItem) {
-                    Label("General", image: "gear")
-                }
-                NavigationLink(destination: WindowView(), tag: "Window", selection: $selectedItem) {
-                    Label("Windows", image: "window")
-                }
-                NavigationLink(destination: HotkeyView(), tag: "Hotkey", selection: $selectedItem) {
-                    Label("Hotkey", image: "hotkey")
-                }
-                NavigationLink(destination: FilterView(), tag: "Filter", selection: $selectedItem) {
-                    Label("App Filter", image: "block")
-                }
+                Label("General", image: "gear").tag(SettingsPage.general)
+                Label("Windows", image: "window").tag(SettingsPage.windows)
+                Label("Hotkey", image: "hotkey").tag(SettingsPage.hotkeys)
+                Label("App Filter", image: "block").tag(SettingsPage.filters)
             }
             .listStyle(.sidebar)
             .padding(.top, 9)
+        } detail: {
+            Group {
+                switch selectedItem ?? .general {
+                case .general:
+                    GeneralView()
+                case .windows:
+                    WindowView()
+                case .hotkeys:
+                    HotkeyView()
+                case .filters:
+                    FilterView()
+                }
+            }
+            .navigationTitle("Topit Settings")
         }
         .frame(width: 600, height: 400)
-        .navigationTitle("Topit Settings")
     }
 }
 
@@ -45,38 +57,30 @@ struct GeneralView: View {
     var body: some View {
         SForm {
             SGroupBox(label: "General") {
-                if #available(macOS 13, *) {
-                    SToggle("Launch at Login", isOn: $launchAtLogin)
-                        .onChange(of: launchAtLogin) { newValue in
-                            do {
-                                if newValue {
-                                    try SMAppService.mainApp.register()
-                                } else {
-                                    try SMAppService.mainApp.unregister()
-                                }
-                            }catch{
-                                print("Failed to \(newValue ? "enable" : "disable") launch at login: \(error.localizedDescription)")
+                SToggle("Launch at Login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { newValue in
+                        do {
+                            if newValue {
+                                try SMAppService.mainApp.register()
+                            } else {
+                                try SMAppService.mainApp.unregister()
                             }
+                        } catch {
+                            print("Failed to \(newValue ? "enable" : "disable") launch at login: \(error.localizedDescription)")
                         }
-                    SDivider()
-                }
+                    }
+                SDivider()
                 SToggle("Show Topit on Dock", isOn: $showOnDock)
                 SDivider()
                 SToggle("Show Topit on Menu Bar", isOn: $showMenubar)
             }
-            SGroupBox(label: "Update") {
-                UpdaterSettingsView(updater: updaterController.updater)
-            }
-            VStack(spacing: 8) {
-                CheckForUpdatesView(updater: updaterController.updater)
-                if let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
-                    Text("Topit v\(appVersion)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
+            if let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                Text("Topit v\(appVersion)")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
             }
         }
-        .onAppear{ if #available(macOS 13, *) { launchAtLogin = (SMAppService.mainApp.status == .enabled) }}
+        .onAppear { launchAtLogin = SMAppService.mainApp.status == .enabled }
         .onChange(of: showMenubar) { newValue in statusBarItem.isVisible = newValue }
         .onChange(of: showOnDock) { newValue in
             if !newValue {
@@ -88,9 +92,6 @@ struct GeneralView: View {
 }
 
 struct WindowView: View {
-    @AppStorage("showCloseButton") private var showCloseButton: Bool = true
-    @AppStorage("showUnpinButton") private var showUnpinButton: Bool = true
-    @AppStorage("showPauseButton") private var showPauseButton: Bool = true
     @AppStorage("buttonPosition") private var buttonPosition: Int = 0
     @AppStorage("mouseOverAction") private var mouseOverAction: Bool = true
     @AppStorage("keepFocus") private var keepFocus: Bool = false
@@ -127,16 +128,10 @@ struct WindowView: View {
                 }
             }
             SGroupBox {
-                if #available (macOS 13, *) {
-                    SToggle("Ducking Between Pinned Windows", isOn: $autoAvoid,
-                            tips: "By enabling this, Topit will hide other pinned windows that overlap with the currently active window.")
-                    SDivider()
-                    SToggle("Add Border for Translucent Window", isOn: $showBorder)
-                } else {
-                    SToggle("Show Close Button", isOn: $showCloseButton)
-                    SDivider()
-                    SToggle("Show Unpin Button", isOn: $showUnpinButton)
-                }
+                SToggle("Ducking Between Pinned Windows", isOn: $autoAvoid,
+                        tips: "By enabling this, Topit will hide other pinned windows that overlap with the currently active window.")
+                SDivider()
+                SToggle("Add Border for Translucent Window", isOn: $showBorder)
             }
         }
     }

@@ -44,5 +44,4 @@ brew install lihaoyun6/tap/topit
 <img src="./img/donate.png" width="350"/>
 
 ## Thanks
-[Sparkle](https://github.com/sparkle-project/Sparkle) @Sparkle  
 [ChatGPT](https://chat.openai.com) @OpenAI  

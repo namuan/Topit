@@ -135,7 +135,9 @@ struct OverlayView12: View {
                         let newDisplay = nsWindow?.screen
                         if newFrame.size != nsWindow?.frame.size || nsScreen != newDisplay {
                             nsScreen = newDisplay
-                            cm.updateStreamSize(newWidth: frame.width, newHeight: frame.height, screen: newDisplay)
+                            MainActor.assumeIsolated {
+                                cm.updateStreamSize(newWidth: frame.width, newHeight: frame.height, screen: newDisplay)
+                            }
                         }
                         nsWindow?.setFrame(CGRectTransform(cgRect: frame), display: true)
                         windowSize = frame.size

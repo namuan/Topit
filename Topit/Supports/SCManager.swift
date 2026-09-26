@@ -13,6 +13,7 @@ class AvoidManager: ObservableObject {
     @Published var activedFrame: CGRect = .zero
 }
 
+@MainActor
 class ScreenCaptureManager: NSObject, ObservableObject, SCStreamDelegate, SCStreamOutput {
     @AppStorage("maxFps") private var maxFps: Int = 65535
     
@@ -24,12 +25,12 @@ class ScreenCaptureManager: NSObject, ObservableObject, SCStreamDelegate, SCStre
     private var filter: SCContentFilter!
     private var scDisplay: SCDisplay!
     
-    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
+    nonisolated func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
         guard sampleBuffer.isValid else { return }
         switch outputType {
         case .screen:
-            DispatchQueue.main.async { [weak self] in
-                self?.videoLayer.enqueue(sampleBuffer)
+            MainActor.assumeIsolated {
+                self.videoLayer.enqueue(sampleBuffer)
             }
         case .audio:
             break
@@ -49,7 +50,7 @@ class ScreenCaptureManager: NSObject, ObservableObject, SCStreamDelegate, SCStre
             let frameRate = min(maxFps, display.nsScreen?.maximumFramesPerSecond ?? 60)
             configuration.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(frameRate))
             configuration.showsCursor = false
-            if #available (macOS 13, *) { configuration.capturesAudio = false }
+            configuration.capturesAudio = false
 
             filter = SCContentFilter(desktopIndependentWindow: window)
             if #available(macOS 14, *) {
@@ -62,20 +63,16 @@ class ScreenCaptureManager: NSObject, ObservableObject, SCStreamDelegate, SCStre
             }
             
             stream = SCStream(filter: filter, configuration: configuration, delegate: self)
-            try stream?.addStreamOutput(self, type: .screen, sampleHandlerQueue: .global())
+            try stream?.addStreamOutput(self, type: .screen, sampleHandlerQueue: .main)
             
             try await stream?.startCapture()
-            DispatchQueue.main.async {
-                self.capturing = true
-                self.capturError = false
-            }
+            capturing = true
+            capturError = false
         } catch {
             print("Start capture failed with error: \(error)")
-            DispatchQueue.main.async {
-                self.stream = nil
-                self.capturing = false
-                self.capturError = true
-            }
+            stream = nil
+            capturing = false
+            capturError = true
         }
     }
     
@@ -86,19 +83,15 @@ class ScreenCaptureManager: NSObject, ObservableObject, SCStreamDelegate, SCStre
         do {
             if stream != nil { return }
             stream = SCStream(filter: filter, configuration: configuration, delegate: self)
-            try stream?.addStreamOutput(self, type: .screen, sampleHandlerQueue: .global())
+            try stream?.addStreamOutput(self, type: .screen, sampleHandlerQueue: .main)
             try await stream?.startCapture()
-            DispatchQueue.main.async {
-                self.capturing = true
-                self.capturError = false
-            }
+            capturing = true
+            capturError = false
         } catch {
             print("Resume capture failed with error: \(error)")
-            DispatchQueue.main.async {
-                self.stream = nil
-                self.capturing = false
-                self.capturError = true
-            }
+            stream = nil
+            capturing = false
+            capturError = true
         }
     }
     
@@ -115,24 +108,24 @@ class ScreenCaptureManager: NSObject, ObservableObject, SCStreamDelegate, SCStre
         }
     }
     
-    func stream(_ stream: SCStream, didStopWithError error: Error) {
+    nonisolated func stream(_ stream: SCStream, didStopWithError error: Error) {
         print("Capture stopped with error: \(error)")
-        DispatchQueue.main.async {
-            self.stream = nil
-            self.capturing = false
-            self.capturError = true
+        Task { @MainActor [weak self] in
+            self?.stream = nil
+            self?.capturing = false
+            self?.capturError = true
         }
     }
 
     func stopCapture() {
         if stream == nil { return }
-        stream?.stopCapture { error in
-            DispatchQueue.main.async{
-                self.stream = nil
-                self.capturing = false
-                self.capturError = false
-                self.videoLayer.removeFromSuperlayer()
-                self.videoLayer = AVSampleBufferDisplayLayer()
+        stream?.stopCapture { [weak self] error in
+            Task { @MainActor in
+                self?.stream = nil
+                self?.capturing = false
+                self?.capturError = false
+                self?.videoLayer.removeFromSuperlayer()
+                self?.videoLayer = AVSampleBufferDisplayLayer()
                 if let error = error {
                     print("Failed to stop capture: \(error)")
                     //self.capturError = true
@@ -165,9 +158,7 @@ class SCManager {
             if let error = error {
                 switch error {
                 case SCStreamError.userDeclined:
-                    DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
-                        self.updateAvailableContent() {_ in}
-                    }
+                    print("Screen recording permission was not granted.")
                 default:
                     print("Error: failed to fetch available content: ".local, error.localizedDescription)
                 }
@@ -207,6 +198,7 @@ class SCManager {
     }
 }
 
+@MainActor
 class WindowSelectorViewModel: NSObject, ObservableObject, SCStreamDelegate, SCStreamOutput {
     @Published var windowThumbnails = [SCDisplay:[WindowThumbnail]]()
     @Published var isReady = false
@@ -218,7 +210,13 @@ class WindowSelectorViewModel: NSObject, ObservableObject, SCStreamDelegate, SCS
         //DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { self.setupStreams(filter: filter) }
     }
     
-    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+    nonisolated func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        MainActor.assumeIsolated {
+            handleSampleBuffer(stream, sampleBuffer: sampleBuffer)
+        }
+    }
+
+    private func handleSampleBuffer(_ stream: SCStream, sampleBuffer: CMSampleBuffer) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         let ciContext = CIContext()
@@ -236,26 +234,31 @@ class WindowSelectorViewModel: NSObject, ObservableObject, SCStreamDelegate, SCS
                 self.streams[index].stopCapture()
                 return
             }
-            for d in displays {
-                DispatchQueue.main.async {[self] in
-                    if windowThumbnails[d] != nil {
-                        if !windowThumbnails[d]!.contains(where: { $0.window == currentWindow }) { windowThumbnails[d]!.append(thumbnail) }
-                    } else {
-                        windowThumbnails[d] = [thumbnail]
+            for display in displays {
+                if windowThumbnails[display] != nil {
+                    if !windowThumbnails[display]!.contains(where: { $0.window == currentWindow }) {
+                        windowThumbnails[display]!.append(thumbnail)
                     }
+                } else {
+                    windowThumbnails[display] = [thumbnail]
                 }
             }
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { self.streams[index].stopCapture() }
-            if index + 1 == streams.count { DispatchQueue.main.async { self.isReady = true }}
+            Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                guard let self, index < self.streams.count else { return }
+                try? await self.streams[index].stopCapture()
+            }
+            if index + 1 == streams.count { isReady = true }
         }
     }
 
     func setupStreams(filter: Bool = false, capture: Bool = true) {
-        SCManager.updateAvailableContent {[self] availableContent in
-            Task {
+        SCManager.updateAvailableContent { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
                 do {
                     streams.removeAll()
-                    DispatchQueue.main.async { self.windowThumbnails.removeAll() }
+                    windowThumbnails.removeAll()
                     allWindows = SCManager.getWindows().filter({
                         !($0.title == "" && $0.owningApplication?.bundleIdentifier == "com.apple.finder")
                         && $0.owningApplication?.bundleIdentifier != Bundle.main.bundleIdentifier
@@ -274,7 +277,7 @@ class WindowSelectorViewModel: NSObject, ObservableObject, SCStreamDelegate, SCS
                             streamConfiguration.height = Int(height * factor)
                             streamConfiguration.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(1))
                             streamConfiguration.pixelFormat = kCVPixelFormatType_32BGRA
-                            if #available(macOS 13, *) { streamConfiguration.capturesAudio = false }
+                            streamConfiguration.capturesAudio = false
                             streamConfiguration.showsCursor = false
                             streamConfiguration.scalesToFit = true
                             streamConfiguration.queueDepth = 3
@@ -286,20 +289,18 @@ class WindowSelectorViewModel: NSObject, ObservableObject, SCStreamDelegate, SCS
                     } else {
                         for w in allWindows {
                             let thumbnail = WindowThumbnail(image: NSImage.unknowScreen, window: w)
-                            guard let displays = availableContent?.displays.filter({ w.frame.intersects($0.frame) }) else { break }
-                            for d in displays {
-                                DispatchQueue.main.async {[self] in
-                                    if windowThumbnails[d] != nil {
-                                        if !windowThumbnails[d]!.contains(where: { $0.window == w }) {
-                                            windowThumbnails[d]!.append(thumbnail)
-                                        }
-                                    } else {
-                                        windowThumbnails[d] = [thumbnail]
+                            guard let displays = SCManager.availableContent?.displays.filter({ w.frame.intersects($0.frame) }) else { break }
+                            for display in displays {
+                                if windowThumbnails[display] != nil {
+                                    if !windowThumbnails[display]!.contains(where: { $0.window == w }) {
+                                        windowThumbnails[display]!.append(thumbnail)
                                     }
+                                } else {
+                                    windowThumbnails[display] = [thumbnail]
                                 }
                             }
                         }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { self.isReady = true }
+                        isReady = true
                     }
                 } catch {
                     print("Get windowshot error：\(error)")
